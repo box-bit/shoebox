@@ -4,7 +4,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
 )
 
 var errUsage = errors.New("Usage error")
@@ -63,15 +65,18 @@ func run() error {
 }
 
 func exploreTree(rootFolder string) error {
-	dirEntry, err := os.ReadDir(rootFolder)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("%s\n", rootFolder)
-	for _, dir := range dirEntry {
-		fmt.Printf("-%s\n", dir.Name())
-	}
-
+	filepath.WalkDir(rootFolder, func(path string, d fs.DirEntry, err error) error {
+		if d.IsDir() {
+			fmt.Printf("%s of type directory\n", path)
+		} else {
+			fmt.Printf("%s with ext %s\n", path, filepath.Ext(path))
+			fileInfo, err := os.Stat(path)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Modification time: %v\n\n", fileInfo.ModTime())
+		}
+		return nil
+	})
 	return nil
 }
