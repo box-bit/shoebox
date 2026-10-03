@@ -4,10 +4,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/fs"
 	"os"
-	"path/filepath"
-	"time"
+
+	"github.com/box-bit/shoebox/internal/tree"
 )
 
 var errUsage = errors.New("Usage error")
@@ -54,10 +53,10 @@ func run() error {
 		return fmt.Errorf("path \"%s\" is not a directory", rootDir)
 	}
 
-	treeMap, err := exploreTree(rootDir)
+	treeMap, err := tree.ExploreTree(rootDir)
 	for v, _ := range treeMap {
 		fmt.Println(v)
-		fmt.Println("\t", treeMap[v].modTime)
+		fmt.Println("\t", treeMap[v].ModTime)
 	}
 	if err != nil {
 		return err
@@ -65,37 +64,4 @@ func run() error {
 
 	return nil
 
-}
-
-type fileInfo struct {
-	name      string
-	extension string
-	modTime   time.Time
-}
-
-func exploreTree(rootFolder string) (map[string]fileInfo, error) {
-
-	m := map[string]fileInfo{}
-
-	err := filepath.WalkDir(rootFolder, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() && d.Type().IsRegular() {
-			info, err := d.Info()
-			if err != nil {
-				return err
-			}
-			relPath, err := filepath.Rel(rootFolder, path)
-			if err != nil {
-				return err
-			}
-			m[relPath] = fileInfo{info.Name(), filepath.Ext(relPath), info.ModTime()}
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return m, nil
 }
