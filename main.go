@@ -62,18 +62,18 @@ func elaborateInput(diff bool) (string, string, error) {
 
 func run() error {
 	flag.Usage = func() {
-		fmt.Fprintln(flag.CommandLine.Output(), "usage: shoebox [flags] <backup-dir> <root-dir>")
+		fmt.Fprintln(flag.CommandLine.Output(), "usage: shoebox [flags] <backup-dir> <target-dir>")
 		flag.PrintDefaults()
 	}
 	diffFlag := flag.Bool("diff", false, "shows the diff between the backup and the target folder")
 
 	flag.Parse()
-	backup, root, err := elaborateInput(*diffFlag)
+	backup, target, err := elaborateInput(*diffFlag)
 	if err != nil {
 		return err
 	}
 
-	if err := tree.CompareTrees(backup, root); err != nil {
+	if err := tree.CompareTrees(backup, target); err != nil {
 		return fmt.Errorf("compare trees: %w", err)
 	}
 	return nil
