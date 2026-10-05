@@ -10,11 +10,11 @@ import (
 	"github.com/box-bit/shoebox/internal/tree"
 )
 
-var errUsage = errors.New("Usage error")
+var errUsage = errors.New("usage")
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
+		fmt.Fprintln(os.Stderr, "shoebox:", err)
 		if errors.Is(err, errUsage) {
 			flag.Usage()
 			os.Exit(2)
@@ -25,33 +25,39 @@ func main() {
 
 func checkDir(path string) error {
 
-	inf, err := os.Stat(path)
+	info, err := os.Stat(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("path \"%s\" doesn't exists", path)
+		return fmt.Errorf("%q: %w", path, fs.ErrNotExist)
 	}
 	if err != nil {
-		return fmt.Errorf("open directory: %w", err)
+		return err
 	}
 
-	if !inf.IsDir() {
-		return fmt.Errorf("path \"%s\" is not a directory", path)
+	if !info.IsDir() {
+		return fmt.Errorf("%q is not a directory", path)
 	}
 
 	return nil
 }
 
-func handleDiff(backup string, target string) error {
-	if err := checkDir(backup); err != nil {
-		return fmt.Errorf("backup folder: %w", err)
+func elaborateInput(diff bool) (string, string, error) {
+	if diff {
+		if flag.NArg() != 2 {
+			return "", "", fmt.Errorf("%w: expected 2 directories, got %d", errUsage, flag.NArg())
+		}
+
+		backup, target := flag.Arg(0), flag.Arg(1)
+
+		if err := checkDir(backup); err != nil {
+			return "", "", fmt.Errorf("backup directory: %w", err)
+		}
+
+		if err := checkDir(target); err != nil {
+			return "", "", fmt.Errorf("target directory: %w", err)
+		}
+		return backup, target, nil
 	}
-
-	if err := checkDir(target); err != nil {
-		return fmt.Errorf("target folder: %w", err)
-	}
-
-	tree.CompareTrees(backup, target)
-	return nil
-
+	return "", "", fmt.Errorf("%w: no command given", errUsage)
 }
 
 func run() error {
@@ -60,41 +66,15 @@ func run() error {
 		flag.PrintDefaults()
 	}
 	diffFlag := flag.Bool("diff", false, "shows the diff between the backup and the target folder")
-	var backupRoot string
-	var targetRoot string
-	flag.StringVar(&backupRoot, "backup", "", "root directory of the photo database")
-	flag.StringVar(&targetRoot, "target", "", "root directory of the photo you want to push with the backup")
+
 	flag.Parse()
+	backup, root, err := elaborateInput(*diffFlag)
+	if err != nil {
+		return err
+	}
 
-	if *diffFlag {
-		if backupRoot != "" && targetRoot != "" {
-			if flag.NArg() > 0 {
-				return fmt.Errorf("%w: unexpected extra argument", errUsage)
-			}
-		} else if backupRoot == "" && targetRoot != "" {
-			if flag.NArg() > 1 {
-				return fmt.Errorf("%w: unexpected extra argument", errUsage)
-			}
-			backupRoot = flag.Arg(0)
-		} else if targetRoot == "" && backupRoot != "" {
-			if flag.NArg() > 1 {
-				return fmt.Errorf("%w: unexpected extra argument", errUsage)
-			}
-			targetRoot = flag.Arg(0)
-		} else {
-			if flag.NArg() > 2 {
-				return fmt.Errorf("%w: unexpected extra argument", errUsage)
-			}
-			if flag.NArg() < 2 {
-				return fmt.Errorf("%w: too few arguments", errUsage)
-			}
-			backupRoot, targetRoot = flag.Arg(0), flag.Arg(1)
-
-		}
-
-		if err := handleDiff(backupRoot, targetRoot); err != nil {
-			return err
-		}
+	if err := tree.CompareTrees(backup, root); err != nil {
+		return fmt.Errorf("compare trees: %w", err)
 	}
 	return nil
 }
