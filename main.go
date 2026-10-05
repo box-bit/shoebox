@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"syscall"
 
 	"github.com/box-bit/shoebox/internal/tree"
 )
 
 var errUsage = errors.New("usage")
+var errNotDir = errors.New("not a directory")
 
 func main() {
 	if err := run(); err != nil {
@@ -26,7 +28,8 @@ func main() {
 func checkDir(path string) error {
 
 	info, err := os.Stat(path)
-	if errors.Is(err, fs.ErrNotExist) {
+	// syscall.ENOTDIR is raised when OS try to resolve a path that is actually a file (ex /A/B/C where B is a file)
+	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
 		return fmt.Errorf("%q: %w", path, fs.ErrNotExist)
 	}
 	if err != nil {
@@ -34,7 +37,7 @@ func checkDir(path string) error {
 	}
 
 	if !info.IsDir() {
-		return fmt.Errorf("%q is not a directory", path)
+		return fmt.Errorf("%q: %w", path, errNotDir)
 	}
 
 	return nil
