@@ -12,11 +12,11 @@ type Entry struct {
 	ModTime   time.Time
 }
 
-func ExploreTree(rootFolder string) (map[string]Entry, error) {
+func CompareTrees(backup string, target string) error {
 
 	m := map[string]Entry{}
 
-	err := filepath.WalkDir(rootFolder, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(backup, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -25,7 +25,7 @@ func ExploreTree(rootFolder string) (map[string]Entry, error) {
 			if err != nil {
 				return err
 			}
-			relPath, err := filepath.Rel(rootFolder, path)
+			relPath, err := filepath.Rel(backup, path)
 			if err != nil {
 				return err
 			}
@@ -34,7 +34,7 @@ func ExploreTree(rootFolder string) (map[string]Entry, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	return m, nil
+	return nil
 }
