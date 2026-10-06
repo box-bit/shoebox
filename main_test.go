@@ -3,31 +3,12 @@ package main
 import (
 	"errors"
 	"io/fs"
-	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"github.com/box-bit/shoebox/internal/testfs"
 )
 
-func createFakeTree(t *testing.T, structure []string) string {
-	t.Helper()
-	root := t.TempDir()
-	for _, path := range structure {
-		if strings.HasSuffix(path, "/") {
-			if err := os.MkdirAll(filepath.Join(root, path), 0755); err != nil {
-				t.Fatalf("can't create dir %q: %v", path, err)
-			}
-		} else {
-			if err := os.MkdirAll(filepath.Join(root, filepath.Dir(path)), 0755); err != nil {
-				t.Fatalf("can't create directory %q for file %q: %v", filepath.Dir(path), path, err)
-			}
-			if err := os.WriteFile(filepath.Join(root, path), []byte{}, 0644); err != nil {
-				t.Fatalf("can't create file %q: %v", path, err)
-			}
-		}
-	}
-	return root
-}
 func TestCheckDir(t *testing.T) {
 	data := []struct {
 		name     string
@@ -49,7 +30,7 @@ func TestCheckDir(t *testing.T) {
 	}
 	for _, d := range data {
 		t.Run(d.name, func(t *testing.T) {
-			rootDir := createFakeTree(t, d.tree)
+			rootDir := testfs.Tree(t, d.tree)
 			err := checkDir(filepath.Join(rootDir, d.path))
 			if !errors.Is(err, d.expected) {
 				t.Errorf("Expected %v, got %v", d.expected, err)
