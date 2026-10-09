@@ -127,3 +127,7 @@ func CompareTrees(backup string, target string) (Diff, error) {
 	}
 	return d, nil
 }
+
+func FindDuplicates(target string) ([]string, error) {
+	return []string{}, nil
+}

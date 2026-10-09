@@ -42,28 +42,27 @@ func checkDir(path string) error {
 
 	return nil
 }
+func elaborateDiff() error {
 
-func elaborateInput(diff bool) (string, string, error) {
-	if diff {
-		if flag.NArg() != 2 {
-			return "", "", fmt.Errorf("%w: expected 2 directories, got %d", errUsage, flag.NArg())
-		}
-
-		backup, target := flag.Arg(0), flag.Arg(1)
-
-		if err := checkDir(backup); err != nil {
-			return "", "", fmt.Errorf("backup directory: %w", err)
-		}
-
-		if err := checkDir(target); err != nil {
-			return "", "", fmt.Errorf("target directory: %w", err)
-		}
-		return backup, target, nil
+	if flag.NArg() != 2 {
+		return fmt.Errorf("%w: expected 2 directories, got %d", errUsage, flag.NArg())
 	}
-	return "", "", fmt.Errorf("%w: no command given", errUsage)
-}
 
-func printDiffs(diff tree.Diff) {
+	backup, target := flag.Arg(0), flag.Arg(1)
+
+	if err := checkDir(backup); err != nil {
+		return fmt.Errorf("backup directory: %w", err)
+	}
+
+	if err := checkDir(target); err != nil {
+		return fmt.Errorf("target directory: %w", err)
+	}
+
+	diff, err := tree.CompareTrees(backup, target)
+	if err != nil {
+		return fmt.Errorf("compare trees: %w", err)
+	}
+
 	fmt.Println("Differences found")
 	fmt.Println("\nChanged files:")
 	for _, p := range diff.Changed {
@@ -73,6 +72,29 @@ func printDiffs(diff tree.Diff) {
 	for _, p := range diff.OnlyInTarget {
 		fmt.Printf("\t %q\n", p)
 	}
+	return nil
+}
+
+func elaborateDupl() error {
+
+	if flag.NArg() != 1 {
+		return fmt.Errorf("%w: expected 1 directory, got %d", errUsage, flag.NArg())
+	}
+
+	target := flag.Arg(0)
+
+	if err := checkDir(target); err != nil {
+		return fmt.Errorf("target directory: %w", err)
+	}
+
+	dupl, err := tree.FindDuplicates(target)
+	if err != nil {
+		return fmt.Errorf("find duplicates: %w", err)
+	}
+
+	fmt.Println("duplicates found")
+	fmt.Println(dupl)
+	return nil
 }
 
 func run() error {
@@ -81,19 +103,21 @@ func run() error {
 		flag.PrintDefaults()
 	}
 	diffFlag := flag.Bool("diff", false, "shows the diff between the backup and the target folder")
+	duplFlag := flag.Bool("dupl", false, "shows the duplicates found in the given directory")
 
 	flag.Parse()
-	backup, target, err := elaborateInput(*diffFlag)
-	if err != nil {
-		return err
+	switch {
+	case *diffFlag:
+		if err := elaborateDiff(); err != nil {
+			return err
+		}
+	case *duplFlag:
+		if err := elaborateDupl(); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("%w: no command given", errUsage)
 	}
-
-	diffs, err := tree.CompareTrees(backup, target)
-	if err != nil {
-		return fmt.Errorf("compare trees: %w", err)
-	}
-
-	printDiffs(diffs)
 
 	return nil
 }
