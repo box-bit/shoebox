@@ -28,6 +28,26 @@ func Tree(t *testing.T, structure []string) string {
 	return root
 }
 
+// like Tree, but files are created with the given content (path -> content)
+// directory paths must end with / and their content is ignored
+func TreeWithContent(t *testing.T, files map[string]string) string {
+	t.Helper()
+	paths := make([]string, 0, len(files))
+	for path := range files {
+		paths = append(paths, path)
+	}
+	root := Tree(t, paths)
+	for path, content := range files {
+		if strings.HasSuffix(path, "/") {
+			continue
+		}
+		if err := os.WriteFile(filepath.Join(root, path), []byte(content), 0644); err != nil {
+			t.Fatalf("can't write into file %q: %v", path, err)
+		}
+	}
+	return root
+}
+
 // returns filepath of new created file
 func CreateFile(t *testing.T, path string, content string) string {
 	t.Helper()

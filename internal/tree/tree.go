@@ -6,7 +6,9 @@ import (
 	"io"
 	"io/fs"
 	"maps"
+	"os"
 	"path/filepath"
+	"slices"
 	"time"
 )
 
@@ -22,6 +24,32 @@ func encodeFile(r io.Reader) ([sha256.Size]byte, error) {
 		return [sha256.Size]byte{}, err
 	}
 	return [sha256.Size]byte(h.Sum(nil)), nil
+}
+
+func isSameContent(f1 string, f2 string) (bool, error) {
+
+	of1, err := os.Open(f1)
+	if err != nil {
+		return false, fmt.Errorf("can't open file %q: %w", f1, err)
+	}
+	defer of1.Close()
+	of2, err := os.Open(f2)
+	if err != nil {
+		return false, fmt.Errorf("can't open file %q: %w", f2, err)
+	}
+	defer of2.Close()
+	encoded1, err := encodeFile(of1)
+	if err != nil {
+		return false, fmt.Errorf("encoding file %q: %w", f1, err)
+	}
+	encoded2, err := encodeFile(of2)
+	if err != nil {
+		return false, fmt.Errorf("encoding file %q: %w", f2, err)
+	}
+	if encoded1 == encoded2 {
+		return true, nil
+	}
+	return false, nil
 }
 
 func scanTree(root string) (map[string]Entry, error) {
@@ -51,52 +79,51 @@ func scanTree(root string) (map[string]Entry, error) {
 	return m, nil
 }
 
+type Diff struct {
+	Same         []string
+	Changed      []string
+	OnlyInBackup []string
+	OnlyInTarget []string
+}
+
 // check which files are aligned with the backup and which not
-// returns 3 slices
-// 1) both present
-// 2) only in backup (good)
-// 3) only in target (needs to be sync)
-func CompareTrees(backup string, target string) error {
+func CompareTrees(backup string, target string) (Diff, error) {
 	backupScan, err := scanTree(backup)
 	if err != nil {
-		return err
+		return Diff{}, err
 	}
 	targetScan, err := scanTree(target)
 	if err != nil {
-		return err
+		return Diff{}, err
 	}
 
-	var onlyInBackup = map[string]bool{}
-	var onlyInTarget = map[string]bool{}
+	var d = Diff{}
 	// compare by size first, hash only when sizes match
-	var bothPresent = map[string]bool{}
+	// keys are sorted so the result is deterministic
 
-	for k := range maps.Keys(targetScan) {
-		if _, ok := backupScan[k]; !ok {
-			onlyInTarget[k] = true
+	for _, p := range slices.Sorted(maps.Keys(targetScan)) {
+		if _, ok := backupScan[p]; !ok {
+			d.OnlyInTarget = append(d.OnlyInTarget, p)
 		} else {
-			if backupScan[k].size == targetScan[k].size {
-
+			if backupScan[p].size == targetScan[p].size {
+				same, err := isSameContent(filepath.Join(backup, p), filepath.Join(target, p))
+				if err != nil {
+					return Diff{}, err
+				}
+				if same {
+					d.Same = append(d.Same, p)
+				} else {
+					d.Changed = append(d.Changed, p)
+				}
+			} else {
+				d.Changed = append(d.Changed, p)
 			}
-			bothPresent[k] = true
 		}
 	}
-	for k := range maps.Keys(backupScan) {
-		if _, ok := targetScan[k]; ok != true {
-			onlyInBackup[k] = true
+	for _, p := range slices.Sorted(maps.Keys(backupScan)) {
+		if _, ok := targetScan[p]; ok != true {
+			d.OnlyInBackup = append(d.OnlyInBackup, p)
 		}
 	}
-	fmt.Println("only in backup")
-	for k := range maps.Keys(onlyInBackup) {
-		fmt.Println(k)
-	}
-	fmt.Println("\nonly in target")
-	for k := range maps.Keys(onlyInTarget) {
-		fmt.Println(k)
-	}
-	fmt.Println("\nboth present")
-	for k := range maps.Keys(bothPresent) {
-		fmt.Println(k)
-	}
-	return nil
+	return d, nil
 }

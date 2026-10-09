@@ -63,6 +63,18 @@ func elaborateInput(diff bool) (string, string, error) {
 	return "", "", fmt.Errorf("%w: no command given", errUsage)
 }
 
+func printDiffs(diff tree.Diff) {
+	fmt.Println("Differences found")
+	fmt.Println("\nChanged files:")
+	for _, p := range diff.Changed {
+		fmt.Printf("\t %q\n", p)
+	}
+	fmt.Println("\nNew files to sync:")
+	for _, p := range diff.OnlyInTarget {
+		fmt.Printf("\t %q\n", p)
+	}
+}
+
 func run() error {
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "usage: shoebox [flags] <backup-dir> <target-dir>")
@@ -76,8 +88,12 @@ func run() error {
 		return err
 	}
 
-	if err := tree.CompareTrees(backup, target); err != nil {
+	diffs, err := tree.CompareTrees(backup, target)
+	if err != nil {
 		return fmt.Errorf("compare trees: %w", err)
 	}
+
+	printDiffs(diffs)
+
 	return nil
 }
